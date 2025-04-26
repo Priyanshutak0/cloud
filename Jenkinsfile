@@ -2,99 +2,50 @@ pipeline {
     agent any
 
     environment {
-        ACR_NAME = 'acrabhimanyu'
-        AZURE_CREDENTIALS_ID = 'jenkins-pipeline-asp'
-        ACR_LOGIN_SERVER = "${ACR_NAME}.azurecr.io"
+        DOCKER_HUB_USERNAME = 'priyanshutak' // <-- change this to your Docker Hub username
         IMAGE_NAME = 'nodejsdocker1'
         IMAGE_TAG = 'latest'
-        RESOURCE_GROUP = 'myResourceGroup'
-        AKS_CLUSTER = 'myAKSCluster01'
         TF_WORKING_DIR = '.'
     }
 
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'main', url: 'https://github.com/Abhimanyu2811/JenkinsWithNodejsblog.git'
+                git branch: 'main', url: 'https://github.com/Abhimanyu2811/blogWebsite1.git'
             }
         }
+
         stage('Install Node.js Dependencies') {
             steps {
-                dir('blogWebsite-main'){
-                bat 'npm install'
-                }
-            }
-        }
-        
-        stage('Terraform Init') {
-            steps {
-                withCredentials([azureServicePrincipal(credentialsId: AZURE_CREDENTIALS_ID)]) {
-                    bat """
-                    echo "Navigating to Terraform Directory: %TF_WORKING_DIR%"
-                    cd %TF_WORKING_DIR%
-                    echo "Initializing Terraform..."
-                    terraform init
-                    """
+                dir('blogWebsite-main') {
+                    bat 'npm install'
                 }
             }
         }
 
-        stage('Terraform Plan') {
-        steps {
-        withCredentials([azureServicePrincipal(credentialsId: AZURE_CREDENTIALS_ID)]) {
-            bat """
-            echo "Navigating to Terraform Directory: %TF_WORKING_DIR%"
-            cd %TF_WORKING_DIR%
-            terraform plan -out=tfplan
-            """
-        }
-        }
-        }
-        stage('Terraform Apply') {
-        steps {
-        withCredentials([azureServicePrincipal(credentialsId: AZURE_CREDENTIALS_ID)]) {
-            bat """
-            echo "Navigating to Terraform Directory: %TF_WORKING_DIR%"
-            cd %TF_WORKING_DIR%
-            echo "Applying Terraform Plan..."
-            terraform apply -auto-approve tfplan
-            """}
-            }
-        }
         stage('Build Docker Image') {
             steps {
-                dir('blogWebsite-main'){
-                bat "docker build -t %ACR_LOGIN_SERVER%/%IMAGE_NAME%:%IMAGE_TAG% ."
+                dir('blogWebsite-main') {
+                    bat "docker build -t %DOCKER_HUB_USERNAME%/%IMAGE_NAME%:%IMAGE_TAG% ."
                 }
             }
         }
-        stage('Login to ACR') {
-            steps {
-                bat "az acr login --name %ACR_NAME%"
-            }
-        }
 
-        stage('Push Docker Image to ACR') {
+        stage('Docker Hub Login') {
             steps {
-                bat "docker push %ACR_LOGIN_SERVER%/%IMAGE_NAME%:%IMAGE_TAG%"
-            }
-        }
-
-        stage('Get AKS Credentials') {
-            steps {
-                bat "az aks get-credentials --resource-group %RESOURCE_GROUP% --name %AKS_CLUSTER% --overwrite-existing"
-            }
-        }
-
-        stage('Deploy to AKS') {
-            steps {
-                dir('blogWebsite-main'){
-                bat "kubectl apply -f Test.yaml"
+                withCredentials([usernamePassword(credentialsId: 'docker-hub-credentials', usernameVariable: 'DOCKERHUB_USER', passwordVariable: 'DOCKERHUB_PASS')]) {
+                    bat "echo %DOCKERHUB_PASS% | docker login -u %DOCKERHUB_USER% --password-stdin"
                 }
+            }
+        }
+
+        stage('Push Docker Image to Docker Hub') {
+            steps {
+                bat "docker push %DOCKER_HUB_USERNAME%/%IMAGE_NAME%:%IMAGE_TAG%"
             }
         }
     }
-        
+
     post {
         success {
             echo 'All stages completed successfully!'
