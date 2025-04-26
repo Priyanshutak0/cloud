@@ -17,18 +17,14 @@ pipeline {
 
         stage('Install Node.js Dependencies') {
             steps {
-                dir('blogWebsite-main') {
                     bat 'npm install'
-                }
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                dir('blogWebsite-main') {
                     bat "docker build -t %DOCKER_HUB_USERNAME%/%IMAGE_NAME%:%IMAGE_TAG% ."
                 }
-            }
         }
 
         stage('Docker Hub Login') {
